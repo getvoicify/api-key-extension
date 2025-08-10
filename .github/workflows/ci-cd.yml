@@ -254,12 +254,24 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Create and push tag
+      run: |
+        TAG_NAME="v${{ needs.semantic-versioning.outputs.version }}"
+        echo "Creating tag: $TAG_NAME"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git tag -a "$TAG_NAME" -m "Release ${{ needs.semantic-versioning.outputs.version }}"
+        git push origin "$TAG_NAME"
         
     - name: Create GitHub Release
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ needs.semantic-versioning.outputs.tag }}
+        tag_name: "v${{ needs.semantic-versioning.outputs.version }}"
         name: "Release ${{ needs.semantic-versioning.outputs.version }}"
         body: |
           ## What's Changed
@@ -276,9 +288,9 @@ jobs:
           </dependency>
           ```
           
-          Alternatively, download the JAR from [GitHub Packages](https://github.com/voicify/keycloak-api-key-extension/packages) and copy it to your Keycloak providers directory.
+          Alternatively, download the JAR from [GitHub Packages](https://github.com/getvoicify/api-key-extension/packages) and copy it to your Keycloak providers directory.
           
-          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ needs.semantic-versioning.outputs.previous_tag }}...${{ needs.semantic-versioning.outputs.tag }}
+          **Full Changelog**: https://github.com/${{ github.repository }}/commits/main
         draft: false
         prerelease: false
       env:
