@@ -182,13 +182,10 @@ jobs:
         tag_prefix: "v"
         major_pattern: "(BREAKING CHANGE|\\!:)"
         minor_pattern: "(feat|feature):"
-        patch_pattern: "(fix|bugfix|hotfix):"
         version_format: "${major}.${minor}.${patch}"
         change_path: "src/"
-        namespace: ""
         bump_each_commit: false
         search_commit_body: true
-        user_format_type: "csv"
         
     - name: Create changelog
       id: changelog
