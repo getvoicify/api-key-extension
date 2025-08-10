@@ -7,9 +7,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.Provider;
 import org.keycloak.common.util.SecretGenerator;
 import org.keycloak.connections.jpa.JpaConnectionProvider;
-import org.keycloak.models.ClientModel;
 import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.RoleModel;
 import org.keycloak.models.jpa.entities.UserAttributeEntity;
 import org.keycloak.models.jpa.entities.UserEntity;
 import org.keycloak.services.managers.AppAuthManager;
@@ -47,26 +45,15 @@ public class ApiKeyResource {
             addApiKeyAttribute(authResult.getUser().getId());
             return Response.ok().type(MediaType.APPLICATION_JSON).build();
         } catch (Exception e) {
-            int responseCode = 401;
-            if (e instanceof NotAuthorizedException) {
-                String message = e.getMessage();
-                responseCode = message.contains("Bearer token is missing") ? 401 : 403;
-            }
-            return Response.status(responseCode).type(MediaType.APPLICATION_JSON).build();
+            return Response.status(Response.Status.FORBIDDEN).type(MediaType.APPLICATION_JSON).build();
         }
     }
 
     private AuthResult authenticate() {
-        ClientModel client = session.getContext().getRealm().getClientByClientId("iam");
-        RoleModel role = client.getRole("create-pat");
         AuthResult authResult = new AppAuthManager.BearerTokenAuthenticator(session).authenticate();
 
         if (authResult == null) {
             throw new NotAuthorizedException("Bearer token is missing");
-        }
-
-        if (!authResult.getUser().hasRole(role)) {
-            throw new NotAuthorizedException("User does not have required role");
         }
         return authResult;
     }

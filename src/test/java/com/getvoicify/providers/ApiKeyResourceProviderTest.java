@@ -2,6 +2,7 @@ package com.getvoicify.providers;
 
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.restassured.specification.RequestSpecification;
+import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.AccessTokenResponse;
@@ -14,7 +15,7 @@ import static io.restassured.RestAssured.given;
 public class ApiKeyResourceProviderTest {
 
     @Container
-    private static final KeycloakContainer keycloakContainer = new KeycloakContainer("quay.io/keycloak/keycloak:24.0.1")
+    private static final KeycloakContainer keycloakContainer = new KeycloakContainer("quay.io/keycloak/keycloak:26.3.1")
             .withProviderClassesFrom("target/classes");
 
     @Test
@@ -24,7 +25,7 @@ public class ApiKeyResourceProviderTest {
 
     @Test
     public void shouldFailToCreateWithNoBearerToken() {
-        givenSpec().when().post().then().statusCode(401);
+        givenSpec().when().post().then().statusCode(Response.Status.FORBIDDEN.getStatusCode());
     }
 
     @Test
