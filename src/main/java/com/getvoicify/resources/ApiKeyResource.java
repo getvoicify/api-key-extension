@@ -61,15 +61,15 @@ public class ApiKeyResource {
     try {
       AuthResult authResult = authenticate();
       String userId = authResult.getUser().getId();
-      
+
       // Check if user has an existing API key
       if (!hasApiKey(userId)) {
         return Response.status(Response.Status.NOT_FOUND).type(MediaType.APPLICATION_JSON).build();
       }
-      
+
       // Create new API key (addApiKeyAttribute handles removal of old one)
       addApiKeyAttribute(userId);
-      
+
       return Response.ok().type(MediaType.APPLICATION_JSON).build();
     } catch (Exception e) {
       return Response.status(Response.Status.FORBIDDEN).type(MediaType.APPLICATION_JSON).build();
@@ -88,7 +88,7 @@ public class ApiKeyResource {
   public void addApiKeyAttribute(String userId) {
     // Remove any existing API keys first to avoid duplicates
     removeApiKeyAttribute(userId);
-    
+
     String apiKey = secretGenerator.randomString(50);
     UserEntity userEntity = entityManager.find(UserEntity.class, userId);
     UserAttributeEntity attributeEntity = new UserAttributeEntity();
@@ -103,10 +103,11 @@ public class ApiKeyResource {
     // Flush any pending changes to ensure we see the current state
     entityManager.flush();
     entityManager.clear();
-    
-    TypedQuery<UserAttributeEntity> query = entityManager.createQuery(
-        "SELECT ua FROM UserAttributeEntity ua WHERE ua.user.id = :userId AND ua.name = :name",
-        UserAttributeEntity.class);
+
+    TypedQuery<UserAttributeEntity> query =
+        entityManager.createQuery(
+            "SELECT ua FROM UserAttributeEntity ua WHERE ua.user.id = :userId AND ua.name = :name",
+            UserAttributeEntity.class);
     query.setParameter("userId", userId);
     query.setParameter("name", "api-key");
     List<UserAttributeEntity> results = query.getResultList();
@@ -114,13 +115,14 @@ public class ApiKeyResource {
   }
 
   private void removeApiKeyAttribute(String userId) {
-    TypedQuery<UserAttributeEntity> query = entityManager.createQuery(
-        "SELECT ua FROM UserAttributeEntity ua WHERE ua.user.id = :userId AND ua.name = :name",
-        UserAttributeEntity.class);
+    TypedQuery<UserAttributeEntity> query =
+        entityManager.createQuery(
+            "SELECT ua FROM UserAttributeEntity ua WHERE ua.user.id = :userId AND ua.name = :name",
+            UserAttributeEntity.class);
     query.setParameter("userId", userId);
     query.setParameter("name", "api-key");
     List<UserAttributeEntity> results = query.getResultList();
-    
+
     for (UserAttributeEntity attributeEntity : results) {
       entityManager.remove(attributeEntity);
     }

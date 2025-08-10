@@ -5,6 +5,9 @@ import static io.restassured.RestAssured.given;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.restassured.specification.RequestSpecification;
 import jakarta.ws.rs.core.Response;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.keycloak.admin.client.Keycloak;
@@ -13,9 +16,6 @@ import org.keycloak.representations.AccessTokenResponse;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Testcontainers
 public class ApiKeyResourceProviderTest {
@@ -32,7 +32,7 @@ public class ApiKeyResourceProviderTest {
       UserRepresentation adminUser = keycloakClient.realm("master").users().search("admin").get(0);
       UserResource userResource = keycloakClient.realm("master").users().get(adminUser.getId());
       UserRepresentation userRep = userResource.toRepresentation();
-      
+
       // Remove any existing api-key attributes
       if (userRep.getAttributes() != null && userRep.getAttributes().containsKey("api-key")) {
         Map<String, List<String>> attributes = new HashMap<>(userRep.getAttributes());
@@ -71,43 +71,68 @@ public class ApiKeyResourceProviderTest {
   public void shouldRotateExistingApiKeySuccessfully() {
     Keycloak keycloakClient = keycloakContainer.getKeycloakAdminClient();
     AccessTokenResponse accessTokenResponse = keycloakClient.tokenManager().getAccessToken();
-    
+
     // First create an API key
     givenSpec().auth().oauth2(accessTokenResponse.getToken()).when().post().then().statusCode(200);
-    
-    // Then rotate it successfully  
-    givenSpec().auth().oauth2(accessTokenResponse.getToken()).when().put("/rotate").then().statusCode(200);
-    
+
+    // Then rotate it successfully
+    givenSpec()
+        .auth()
+        .oauth2(accessTokenResponse.getToken())
+        .when()
+        .put("/rotate")
+        .then()
+        .statusCode(200);
+
     // And rotate again to ensure it's repeatable
-    givenSpec().auth().oauth2(accessTokenResponse.getToken()).when().put("/rotate").then().statusCode(200);
+    givenSpec()
+        .auth()
+        .oauth2(accessTokenResponse.getToken())
+        .when()
+        .put("/rotate")
+        .then()
+        .statusCode(200);
   }
 
   @Test
   public void shouldRotateExistingApiKey() {
     Keycloak keycloakClient = keycloakContainer.getKeycloakAdminClient();
     AccessTokenResponse accessTokenResponse = keycloakClient.tokenManager().getAccessToken();
-    
+
     // First create an API key
     givenSpec().auth().oauth2(accessTokenResponse.getToken()).when().post().then().statusCode(200);
-    
+
     // Then rotate it
-    givenSpec().auth().oauth2(accessTokenResponse.getToken()).when().put("/rotate").then().statusCode(200);
+    givenSpec()
+        .auth()
+        .oauth2(accessTokenResponse.getToken())
+        .when()
+        .put("/rotate")
+        .then()
+        .statusCode(200);
   }
 
   @Test
   public void shouldValidateApiKeyAfterRotation() {
     Keycloak keycloakClient = keycloakContainer.getKeycloakAdminClient();
     AccessTokenResponse accessTokenResponse = keycloakClient.tokenManager().getAccessToken();
-    
+
     // Create initial API key
     givenSpec().auth().oauth2(accessTokenResponse.getToken()).when().post().then().statusCode(200);
-    
-    // Test that we can check the API key exists (by trying to access validation endpoint with wrong key)
+
+    // Test that we can check the API key exists (by trying to access validation endpoint with wrong
+    // key)
     givenSpec().when().get("/check?apiKey=invalid").then().statusCode(401);
-    
+
     // Rotate the API key
-    givenSpec().auth().oauth2(accessTokenResponse.getToken()).when().put("/rotate").then().statusCode(200);
-    
+    givenSpec()
+        .auth()
+        .oauth2(accessTokenResponse.getToken())
+        .when()
+        .put("/rotate")
+        .then()
+        .statusCode(200);
+
     // The old invalid key should still be invalid (this test just verifies rotation completed)
     givenSpec().when().get("/check?apiKey=invalid").then().statusCode(401);
   }
