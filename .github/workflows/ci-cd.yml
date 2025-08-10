@@ -67,8 +67,8 @@ jobs:
     - name: Compile project
       run: ./mvnw clean compile
       
-    - name: Run tests
-      run: ./mvnw test
+    - name: Run tests with coverage
+      run: ./mvnw test jacoco:report
       
     - name: Generate test report
       uses: dorny/test-reporter@v1
@@ -92,6 +92,15 @@ jobs:
       with:
         name: coverage-reports
         path: target/site/jacoco/
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: always()
+      with:
+        file: target/site/jacoco/jacoco.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
 
   package:
     name: Package Application
