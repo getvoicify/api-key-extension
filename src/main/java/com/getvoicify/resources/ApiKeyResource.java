@@ -42,6 +42,27 @@ public class ApiKeyResource {
         : Response.status(401).type(MediaType.APPLICATION_JSON).build();
   }
 
+  @GET
+  @Produces("application/json")
+  public Response getApiKey() {
+    try {
+      AuthResult authResult = authenticate();
+      String userId = authResult.getUser().getId();
+
+      // Get the user's API key
+      String apiKey = getApiKeyAttribute(userId);
+      if (apiKey == null) {
+        return Response.status(Response.Status.NOT_FOUND).type(MediaType.APPLICATION_JSON).build();
+      }
+
+      // Return the API key in JSON format
+      String jsonResponse = String.format("{\"apiKey\":\"%s\"}", apiKey);
+      return Response.ok(jsonResponse).type(MediaType.APPLICATION_JSON).build();
+    } catch (Exception e) {
+      return Response.status(Response.Status.FORBIDDEN).type(MediaType.APPLICATION_JSON).build();
+    }
+  }
+
   @POST
   @Produces("application/json")
   public Response createApiKey() {
@@ -112,6 +133,22 @@ public class ApiKeyResource {
     query.setParameter("name", "api-key");
     List<UserAttributeEntity> results = query.getResultList();
     return !results.isEmpty();
+  }
+
+  private String getApiKeyAttribute(String userId) {
+    // Flush any pending changes to ensure we see the current state
+    entityManager.flush();
+    entityManager.clear();
+
+    TypedQuery<UserAttributeEntity> query =
+        entityManager.createQuery(
+            "SELECT ua FROM UserAttributeEntity ua WHERE ua.user.id = :userId AND ua.name = :name",
+            UserAttributeEntity.class);
+    query.setParameter("userId", userId);
+    query.setParameter("name", "api-key");
+    List<UserAttributeEntity> results = query.getResultList();
+
+    return results.isEmpty() ? null : results.get(0).getValue();
   }
 
   private void removeApiKeyAttribute(String userId) {

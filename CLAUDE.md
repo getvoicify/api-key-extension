@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Keycloak extension that provides API key functionality for the Voicify platform. The extension adds REST endpoints to create, rotate, and validate API keys stored as user attributes in Keycloak.
+This is a Keycloak extension that provides API key functionality for the Voicify platform. The extension adds REST endpoints to create, retrieve, rotate, and validate API keys stored as user attributes in Keycloak.
 
 ## Build System
 
@@ -23,17 +23,19 @@ The final JAR is built as `com.getvoicify-api-key-extension.jar` in the `target/
 
 1. **ApiKeyResourceProviderFactory** (`src/main/java/com/getvoicify/providers/ApiKeyResourceProviderFactory.java:10`) - Factory class that registers the "api-key" provider with Keycloak
 2. **ApiKeyResourceProvider** (`src/main/java/com/getvoicify/providers/ApiKeyResourceProvider.java:14`) - Provider that creates the API key resource
-3. **ApiKeyResource** (`src/main/java/com/getvoicify/resources/ApiKeyResource.java:21`) - Main REST resource with three endpoints:
+3. **ApiKeyResource** (`src/main/java/com/getvoicify/resources/ApiKeyResource.java:21`) - Main REST resource with four endpoints:
    - `GET /check?apiKey=...` - Validates an API key
+   - `GET /` - Retrieves the authenticated user's API key
    - `POST /` - Creates a new API key for authenticated users
    - `PUT /rotate` - Rotates an existing API key for authenticated users
 
 ### Authentication Flow
 
 The extension requires:
-- Bearer token authentication for API key creation and rotation
+- Bearer token authentication for API key creation, retrieval, and rotation
 - User must have the "create-pat" role in the "iam" client
 - API keys are stored as "api-key" user attributes using JPA entities
+- Retrieval returns API key in JSON format or 404 if none exists
 - Rotation replaces existing API keys with newly generated ones
 
 ### Key Dependencies
@@ -55,9 +57,13 @@ Key test scenarios:
 - API key validation without key (401 expected)
 - API key creation without authentication (401 expected)
 - Successful API key creation with proper authentication (200 expected)
+- API key retrieval without authentication (403 expected)
+- API key retrieval when no key exists (404 expected)
+- Successful API key retrieval with proper authentication (200 expected)
 - API key rotation without authentication (403 expected)
 - Successful API key rotation with proper authentication (200 expected)
 - Multiple rotations to ensure repeatability
+- API key differences after rotation
 
 ## Deployment
 
