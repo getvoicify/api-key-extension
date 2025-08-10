@@ -1,6 +1,7 @@
 # Keycloak API Key Extension
 
-[![CI/CD Pipeline](https://github.com/voicify/keycloak-api-key-extension/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/voicify/keycloak-api-key-extension/actions/workflows/ci-cd.yml)
+[![CI/CD Pipeline](https://github.com/getvoicify/api-key-extension/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/getvoicify/api-key-extension/actions/workflows/ci-cd.yml)
+[![codecov](https://codecov.io/gh/getvoicify/api-key-extension/branch/main/graph/badge.svg)](https://codecov.io/gh/getvoicify/api-key-extension)
 
 A Keycloak extension that provides API key functionality for the Voicify platform. This extension adds REST endpoints to create and validate API keys stored as user attributes in Keycloak.
 
@@ -101,7 +102,7 @@ Add this repository to your Maven settings.xml:
 </repositories>
 ```
 
-Then include the dependency (check [releases](https://github.com/voicify/keycloak-api-key-extension/releases) for latest version):
+Then include the dependency (check [releases](https://github.com/getvoicify/api-key-extension/releases) for latest version):
 
 ```xml
 <dependency>
@@ -134,4 +135,4 @@ The project uses two separate GitHub Actions workflows:
 
 ## License
 
-[Add your license information here]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

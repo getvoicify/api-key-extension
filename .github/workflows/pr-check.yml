@@ -137,8 +137,8 @@ jobs:
     - name: Compile project
       run: ./mvnw clean compile
       
-    - name: Run tests
-      run: ./mvnw test
+    - name: Run tests with coverage
+      run: ./mvnw test jacoco:report
       
     - name: Generate test report
       uses: dorny/test-reporter@v1
@@ -156,6 +156,23 @@ jobs:
         name: pr-test-results-${{ github.event.pull_request.number }}
         path: target/surefire-reports/
         retention-days: 7
+        
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pr-coverage-reports-${{ github.event.pull_request.number }}
+        path: target/site/jacoco/
+        retention-days: 7
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: always()
+      with:
+        file: target/site/jacoco/jacoco.xml
+        flags: unittests,pr
+        name: codecov-pr
+        fail_ci_if_error: false
         
     - name: Update PR Status - Build & Test Passed
       if: success()
