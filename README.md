@@ -39,7 +39,29 @@ A Keycloak extension that provides API key functionality for the Voicify platfor
 
 # Run security scan
 ./mvnw org.owasp:dependency-check-maven:check
+
+# Check and fix code formatting (run before committing)
+./mvnw spotless:check    # Check for violations
+./mvnw spotless:apply    # Fix violations automatically
 ```
+
+### Git Pre-commit Hook (Recommended)
+
+To ensure code quality, set up the pre-commit hook that automatically runs linting:
+
+```bash
+# The pre-commit hook is already configured in the repository
+# It will automatically run ./mvnw spotless:check before commits
+# If formatting issues are found, it will attempt to fix them automatically
+
+# To manually test the pre-commit hook:
+.git/hooks/pre-commit
+```
+
+This hook will:
+- ✅ Check code formatting before each commit
+- 🔧 Automatically fix formatting issues when possible  
+- ❌ Prevent commits with unfixable formatting problems
 
 ## API Endpoints
 
