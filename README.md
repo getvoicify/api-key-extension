@@ -8,9 +8,10 @@ A Keycloak extension that provides API key functionality for the Voicify platfor
 ## Features
 
 - **API Key Creation**: Create API keys for authenticated users with proper role validation
+- **API Key Retrieval**: Retrieve existing API keys for authenticated users
 - **API Key Validation**: Validate API keys via REST endpoint
 - **API Key Rotation**: Rotate existing API keys for enhanced security
-- **Role-Based Access**: Requires "create-pat" role in "iam" client for API key creation
+- **Role-Based Access**: Requires "create-pat" role in "iam" client for API key operations
 - **Jakarta EE Compatible**: Built for Keycloak 26.x with full Jakarta EE support
 
 ## Build and Test
@@ -45,6 +46,7 @@ A Keycloak extension that provides API key functionality for the Voicify platfor
 The extension provides the following REST endpoints under `/realms/{realm-name}/api-key/`:
 
 - `GET /check?apiKey=...` - Validates an API key
+- `GET /` - Retrieves the authenticated user's API key
 - `POST /` - Creates a new API key for authenticated users
 - `PUT /rotate` - Rotates an existing API key for authenticated users
 
@@ -54,6 +56,12 @@ The extension provides the following REST endpoints under `/realms/{realm-name}/
 - Requires Bearer token authentication
 - User must have "create-pat" role in "iam" client
 - API keys are stored as "api-key" user attributes
+
+### API Key Retrieval (`GET /`)
+- Requires Bearer token authentication
+- User must have "create-pat" role in "iam" client
+- Returns API key in JSON format: `{"apiKey": "..."}`
+- Returns 404 if user has no existing API key
 
 ### API Key Rotation (`PUT /rotate`)
 - Requires Bearer token authentication
