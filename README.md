@@ -96,7 +96,7 @@ Add this repository to your Maven settings.xml:
 <repositories>
   <repository>
     <id>github</id>
-    <url>https://maven.pkg.github.com/voicify/keycloak-api-key-extension</url>
+    <url>https://maven.pkg.github.com/getvoicify/api-key-extension</url>
   </repository>
 </repositories>
 ```

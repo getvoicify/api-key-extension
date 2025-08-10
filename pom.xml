@@ -211,12 +211,12 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/voicify/keycloak-api-key-extension</url>
+            <url>https://maven.pkg.github.com/getvoicify/api-key-extension</url>
         </repository>
         <snapshotRepository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/voicify/keycloak-api-key-extension</url>
+            <url>https://maven.pkg.github.com/getvoicify/api-key-extension</url>
         </snapshotRepository>
     </distributionManagement>
 </project>
