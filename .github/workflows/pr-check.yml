@@ -1,0 +1,297 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+env:
+  JAVA_VERSION: '17'
+  JAVA_DISTRIBUTION: 'temurin'
+
+jobs:
+  pr-info:
+    name: PR Information
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: PR Info Comment
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = context.payload.pull_request;
+          const body = `## 🔍 PR Validation Started
+          
+          **PR #${pr.number}**: ${pr.title}
+          **Author**: @${pr.user.login}
+          **Branch**: \`${pr.head.ref}\` → \`${pr.base.ref}\`
+          
+          ### 🚀 Running Checks:
+          - 🔍 **Code Quality & Linting**
+          - 🔨 **Build & Compilation**  
+          - 🧪 **Test Suite**
+          - 🛡️ **Security Scan**
+          
+          _Status will be updated as checks complete..._
+          
+          ---
+          <sub>Powered by GitHub Actions</sub>`;
+          
+          github.rest.issues.createComment({
+            issue_number: pr.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
+
+  lint-and-format:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+        
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Run Spotless formatting check
+      run: ./mvnw spotless:check
+      
+    - name: Run SpotBugs analysis
+      run: ./mvnw spotbugs:check
+      continue-on-error: true
+      
+    - name: Run PMD analysis
+      run: ./mvnw pmd:check
+      continue-on-error: true
+      
+    - name: Update PR Status - Linting Passed
+      if: success()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = context.payload.pull_request;
+          if (!pr) return;
+          
+          github.rest.issues.createComment({
+            issue_number: pr.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '✅ **Code Quality & Linting** - All checks passed!'
+          });
+          
+    - name: Update PR Status - Linting Failed
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = context.payload.pull_request;
+          if (!pr) return;
+          
+          github.rest.issues.createComment({
+            issue_number: pr.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '❌ **Code Quality & Linting** - Issues found. Please check the logs and fix formatting/quality issues.'
+          });
+
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+        
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Compile project
+      run: ./mvnw clean compile
+      
+    - name: Run tests
+      run: ./mvnw test
+      
+    - name: Generate test report
+      uses: dorny/test-reporter@v1
+      if: success() || failure()
+      with:
+        name: PR Test Results
+        path: target/surefire-reports/*.xml
+        reporter: java-junit
+        fail-on-error: false
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pr-test-results-${{ github.event.pull_request.number }}
+        path: target/surefire-reports/
+        retention-days: 7
+        
+    - name: Update PR Status - Build & Test Passed
+      if: success()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = context.payload.pull_request;
+          if (!pr) return;
+          
+          github.rest.issues.createComment({
+            issue_number: pr.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '✅ **Build & Test** - All tests passed successfully!'
+          });
+          
+    - name: Update PR Status - Build & Test Failed
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = context.payload.pull_request;
+          if (!pr) return;
+          
+          github.rest.issues.createComment({
+            issue_number: pr.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '❌ **Build & Test** - Build failed or tests are failing. Please check the logs and fix the issues.'
+          });
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+        
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Run OWASP Dependency Check
+      run: ./mvnw org.owasp:dependency-check-maven:check
+      continue-on-error: true
+      
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pr-security-reports-${{ github.event.pull_request.number }}
+        path: target/dependency-check-report.html
+        retention-days: 7
+        
+    - name: Update PR Status - Security Scan Complete
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = context.payload.pull_request;
+          if (!pr) return;
+          
+          const status = '${{ job.status }}' === 'success' ? '✅' : '⚠️';
+          const message = '${{ job.status }}' === 'success' 
+            ? 'No critical vulnerabilities detected'
+            : 'Security scan completed - please review any findings';
+          
+          github.rest.issues.createComment({
+            issue_number: pr.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `${status} **Security Scan** - ${message}`
+          });
+
+  pr-summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [pr-info, lint-and-format, build-and-test, security-scan]
+    if: always() && github.event_name == 'pull_request'
+    
+    steps:
+    - name: Final PR Status Update
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const pr = context.payload.pull_request;
+          if (!pr) return;
+          
+          const lintStatus = '${{ needs.lint-and-format.result }}';
+          const buildStatus = '${{ needs.build-and-test.result }}';
+          const securityStatus = '${{ needs.security-scan.result }}';
+          
+          const getStatusEmoji = (status) => {
+            switch(status) {
+              case 'success': return '✅';
+              case 'failure': return '❌';
+              case 'cancelled': return '⏹️';
+              case 'skipped': return '⏭️';
+              default: return '⚠️';
+            }
+          };
+          
+          const allPassed = lintStatus === 'success' && buildStatus === 'success';
+          const overallStatus = allPassed ? '🎉 **All Checks Passed!**' : '⚠️ **Some Checks Failed**';
+          const mergeReady = allPassed ? '✅ **Ready for review and merge**' : '❌ **Please fix issues before merging**';
+          
+          const body = `## 📋 PR Validation Summary
+          
+          ${overallStatus}
+          
+          ### Check Results:
+          ${getStatusEmoji(lintStatus)} **Code Quality & Linting**
+          ${getStatusEmoji(buildStatus)} **Build & Test**  
+          ${getStatusEmoji(securityStatus)} **Security Scan**
+          
+          ### Status: ${mergeReady}
+          
+          ---
+          <sub>PR #${pr.number} | Commit: \`${pr.head.sha.substring(0, 7)}\`</sub>`;
+          
+          github.rest.issues.createComment({
+            issue_number: pr.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });

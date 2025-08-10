@@ -3,10 +3,6 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-  release:
-    types: [ published ]
 
 env:
   JAVA_VERSION: '17'
@@ -261,36 +257,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Set up JDK ${{ env.JAVA_VERSION }}
-      uses: actions/setup-java@v4
-      with:
-        java-version: ${{ env.JAVA_VERSION }}
-        distribution: ${{ env.JAVA_DISTRIBUTION }}
-        
-    - name: Cache Maven dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
-        
-    - name: Update version from semantic versioning
-      run: |
-        NEW_VERSION="${{ needs.semantic-versioning.outputs.version }}"
-        echo "Setting version to: $NEW_VERSION"
-        ./mvnw versions:set -DnewVersion=${NEW_VERSION} -DgenerateBackupPoms=false
-        
-    - name: Package release artifacts
-      run: ./mvnw clean package -DskipTests
-      
-    - name: Create checksums
-      run: |
-        cd target
-        for file in *.jar; do
-          sha256sum "$file" > "$file.sha256"
-          md5sum "$file" > "$file.md5"
-        done
         
     - name: Create GitHub Release
       id: create_release
@@ -302,15 +268,20 @@ jobs:
           ## What's Changed
           ${{ needs.semantic-versioning.outputs.changelog }}
           
-          ## Artifacts
-          - `com.getvoicify-api-key-extension.jar` - Main extension JAR
-          - Checksums included for verification
+          ## Installation
+          This version has been published to GitHub Packages and can be consumed as a Maven dependency:
+          
+          ```xml
+          <dependency>
+            <groupId>com.getvoicify</groupId>
+            <artifactId>api-key-extension</artifactId>
+            <version>${{ needs.semantic-versioning.outputs.version }}</version>
+          </dependency>
+          ```
+          
+          Alternatively, download the JAR from [GitHub Packages](https://github.com/voicify/keycloak-api-key-extension/packages) and copy it to your Keycloak providers directory.
           
           **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ needs.semantic-versioning.outputs.previous_tag }}...${{ needs.semantic-versioning.outputs.tag }}
-        files: |
-          target/*.jar
-          target/*.jar.sha256
-          target/*.jar.md5
         draft: false
         prerelease: false
       env:

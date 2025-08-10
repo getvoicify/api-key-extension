@@ -117,14 +117,20 @@ See [CLAUDE.md](CLAUDE.md) for detailed development guidance and architecture in
 
 ## CI/CD Pipeline
 
-The GitHub Actions workflow includes:
+The project uses two separate GitHub Actions workflows:
 
-1. **Lint and Code Quality**: Spotless formatting, SpotBugs, PMD analysis
-2. **Build and Test**: Compilation and test execution with Testcontainers
-3. **Security Scan**: OWASP dependency vulnerability check
-4. **Package**: JAR creation and artifact upload
-5. **Publish**: Automatic publishing to GitHub Packages
-6. **Release**: Automatic release artifact creation with checksums
+### **Pull Request Workflow** (`pr-check.yml`)
+- ✅ **Real-time PR status updates** with progress comments
+- ✅ **Code Quality & Linting**: Spotless formatting, SpotBugs, PMD analysis
+- ✅ **Build & Test**: Compilation and test execution with Testcontainers  
+- ✅ **Security Scan**: OWASP dependency vulnerability check
+- ✅ **Test Results**: Uploaded as artifacts for review
+
+### **Main Branch Workflow** (`ci-cd.yml`)
+- ✅ **Semantic Versioning**: Automatic version calculation from commits
+- ✅ **Build & Test**: Full compilation and testing
+- ✅ **GitHub Packages**: Automatic publishing for releases
+- ✅ **GitHub Releases**: Automatic release creation with changelog
 
 ## License
 
