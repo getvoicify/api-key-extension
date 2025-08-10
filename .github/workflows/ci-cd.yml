@@ -1,0 +1,365 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  JAVA_VERSION: '17'
+  JAVA_DISTRIBUTION: 'temurin'
+
+jobs:
+  lint-and-format:
+    name: Lint and Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Verify code formatting (Maven)
+      run: ./mvnw spotless:check
+      continue-on-error: true
+      
+    - name: Run SpotBugs analysis
+      run: ./mvnw spotbugs:check
+      continue-on-error: true
+      
+    - name: Run PMD analysis
+      run: ./mvnw pmd:check
+      continue-on-error: true
+
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Compile project
+      run: ./mvnw clean compile
+      
+    - name: Run tests
+      run: ./mvnw test
+      
+    - name: Generate test report
+      uses: dorny/test-reporter@v1
+      if: success() || failure()
+      with:
+        name: Maven Tests
+        path: target/surefire-reports/*.xml
+        reporter: java-junit
+        fail-on-error: true
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: target/surefire-reports/
+        
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-reports
+        path: target/site/jacoco/
+
+  package:
+    name: Package Application
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Package application
+      run: ./mvnw clean package -DskipTests
+      
+    - name: Upload JAR artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: jar-artifacts
+        path: target/*.jar
+        retention-days: 30
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Run OWASP Dependency Check
+      run: ./mvnw org.owasp:dependency-check-maven:check
+      continue-on-error: true
+      
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports
+        path: target/dependency-check-report.html
+
+  semantic-versioning:
+    name: Generate Semantic Version
+    runs-on: ubuntu-latest
+    needs: [build-and-test, package, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      version: ${{ steps.semver.outputs.version }}
+      tag: ${{ steps.semver.outputs.tag }}
+      changelog: ${{ steps.semver.outputs.changelog }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Generate semantic version
+      id: semver
+      uses: paulhatch/semantic-version@v5.4.0
+      with:
+        tag_prefix: "v"
+        major_pattern: "(BREAKING CHANGE|\\!:)"
+        minor_pattern: "(feat|feature):"
+        patch_pattern: "(fix|bugfix|hotfix):"
+        version_format: "${major}.${minor}.${patch}"
+        change_path: "src/"
+        namespace: ""
+        bump_each_commit: false
+        search_commit_body: true
+        user_format_type: "csv"
+        
+    - name: Create changelog
+      id: changelog
+      run: |
+        echo "Creating changelog..."
+        CHANGELOG=$(git log --oneline --pretty=format:"%h %s" $(git describe --tags --abbrev=0 2>/dev/null || echo "")..HEAD | head -20 | sed 's/^/- /')
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+  publish-to-github-packages:
+    name: Publish to GitHub Packages
+    runs-on: ubuntu-latest
+    needs: [build-and-test, package, security-scan, semantic-versioning]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.semantic-versioning.outputs.version != ''
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Configure Maven for GitHub Packages
+      run: |
+        mkdir -p ~/.m2
+        cat > ~/.m2/settings.xml << EOF
+        <settings>
+          <servers>
+            <server>
+              <id>github</id>
+              <username>${{ github.actor }}</username>
+              <password>${{ secrets.GITHUB_TOKEN }}</password>
+            </server>
+          </servers>
+        </settings>
+        EOF
+        
+    - name: Update version from semantic versioning
+      run: |
+        NEW_VERSION="${{ needs.semantic-versioning.outputs.version }}"
+        echo "Setting version to: $NEW_VERSION"
+        ./mvnw versions:set -DnewVersion=${NEW_VERSION} -DgenerateBackupPoms=false
+        
+    - name: Build and publish to GitHub Packages
+      run: ./mvnw clean deploy -DskipTests
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-automatic-release:
+    name: Create Automatic Release
+    runs-on: ubuntu-latest
+    needs: [build-and-test, package, security-scan, semantic-versioning, publish-to-github-packages]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.semantic-versioning.outputs.version != ''
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: ${{ env.JAVA_DISTRIBUTION }}
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Update version from semantic versioning
+      run: |
+        NEW_VERSION="${{ needs.semantic-versioning.outputs.version }}"
+        echo "Setting version to: $NEW_VERSION"
+        ./mvnw versions:set -DnewVersion=${NEW_VERSION} -DgenerateBackupPoms=false
+        
+    - name: Package release artifacts
+      run: ./mvnw clean package -DskipTests
+      
+    - name: Create checksums
+      run: |
+        cd target
+        for file in *.jar; do
+          sha256sum "$file" > "$file.sha256"
+          md5sum "$file" > "$file.md5"
+        done
+        
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.semantic-versioning.outputs.tag }}
+        name: "Release ${{ needs.semantic-versioning.outputs.version }}"
+        body: |
+          ## What's Changed
+          ${{ needs.semantic-versioning.outputs.changelog }}
+          
+          ## Artifacts
+          - `com.getvoicify-api-key-extension.jar` - Main extension JAR
+          - Checksums included for verification
+          
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ needs.semantic-versioning.outputs.previous_tag }}...${{ needs.semantic-versioning.outputs.tag }}
+        files: |
+          target/*.jar
+          target/*.jar.sha256
+          target/*.jar.md5
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, build-and-test, package, security-scan]
+    if: always() && (github.event_name != 'push' || github.ref != 'refs/heads/main')
+    
+    steps:
+    - name: Notify on failure
+      if: contains(needs.*.result, 'failure')
+      run: |
+        echo "❌ Pipeline failed!"
+        echo "Check the logs for more details."
+        exit 1
+        
+    - name: Notify on success
+      if: ${{ !contains(needs.*.result, 'failure') }}
+      run: |
+        echo "✅ Pipeline completed successfully!"
+        echo "All checks passed."
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, build-and-test, package, security-scan, semantic-versioning, publish-to-github-packages, create-automatic-release]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Notify on failure
+      if: contains(needs.*.result, 'failure')
+      run: |
+        echo "❌ Release pipeline failed!"
+        echo "Check the logs for more details."
+        exit 1
+        
+    - name: Notify on success (no version bump)
+      if: ${{ !contains(needs.*.result, 'failure') && needs.semantic-versioning.outputs.version == '' }}
+      run: |
+        echo "✅ Pipeline completed successfully!"
+        echo "No version bump detected - no release created."
+        
+    - name: Notify on successful release
+      if: ${{ !contains(needs.*.result, 'failure') && needs.semantic-versioning.outputs.version != '' }}
+      run: |
+        echo "🎉 Release pipeline completed successfully!"
+        echo "📦 Version: ${{ needs.semantic-versioning.outputs.version }}"
+        echo "🏷️ Tag: ${{ needs.semantic-versioning.outputs.tag }}"
+        echo "📋 Published to GitHub Packages and created release."

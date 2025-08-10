@@ -1,5 +1,7 @@
 package com.getvoicify.providers;
 
+import static io.restassured.RestAssured.given;
+
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.restassured.specification.RequestSpecification;
 import jakarta.ws.rs.core.Response;
@@ -9,39 +11,34 @@ import org.keycloak.representations.AccessTokenResponse;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static io.restassured.RestAssured.given;
-
 @Testcontainers
 public class ApiKeyResourceProviderTest {
 
-    @Container
-    private static final KeycloakContainer keycloakContainer = new KeycloakContainer("quay.io/keycloak/keycloak:26.3.1")
-            .withProviderClassesFrom("target/classes");
+  @Container
+  private static final KeycloakContainer keycloakContainer =
+      new KeycloakContainer("quay.io/keycloak/keycloak:26.3.1")
+          .withProviderClassesFrom("target/classes");
 
-    @Test
-    public void shouldFailWithoutApiKey() {
-        givenSpec().when().get("/check").then().statusCode(401);
-    }
+  @Test
+  public void shouldFailWithoutApiKey() {
+    givenSpec().when().get("/check").then().statusCode(401);
+  }
 
-    @Test
-    public void shouldFailToCreateWithNoBearerToken() {
-        givenSpec().when().post().then().statusCode(Response.Status.FORBIDDEN.getStatusCode());
-    }
+  @Test
+  public void shouldFailToCreateWithNoBearerToken() {
+    givenSpec().when().post().then().statusCode(Response.Status.FORBIDDEN.getStatusCode());
+  }
 
-    @Test
-    public void shouldCreateApiKey() {
-        Keycloak keycloakClient = keycloakContainer.getKeycloakAdminClient();
-        AccessTokenResponse accessTokenResponse = keycloakClient.tokenManager().getAccessToken();
-        givenSpec()
-                .auth()
-                .oauth2(accessTokenResponse.getToken())
-                .when()
-                .post()
-                .then()
-                .statusCode(200);
-    }
+  @Test
+  public void shouldCreateApiKey() {
+    Keycloak keycloakClient = keycloakContainer.getKeycloakAdminClient();
+    AccessTokenResponse accessTokenResponse = keycloakClient.tokenManager().getAccessToken();
+    givenSpec().auth().oauth2(accessTokenResponse.getToken()).when().post().then().statusCode(200);
+  }
 
-    private RequestSpecification givenSpec() {
-        return given().baseUri(keycloakContainer.getAuthServerUrl()).basePath("/realms/master/" + ApiKeyResourceProviderFactory.PROVIDER_ID);
-    }
+  private RequestSpecification givenSpec() {
+    return given()
+        .baseUri(keycloakContainer.getAuthServerUrl())
+        .basePath("/realms/master/" + ApiKeyResourceProviderFactory.PROVIDER_ID);
+  }
 }

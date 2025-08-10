@@ -7,18 +7,19 @@ import org.keycloak.services.resource.RealmResourceProvider;
 import org.keycloak.services.resource.RealmResourceProviderFactory;
 
 public class ApiKeyResourceProviderFactory implements RealmResourceProviderFactory {
-    public static final String PROVIDER_ID = "api-key";
-    public RealmResourceProvider create(KeycloakSession session) {
-        return new ApiKeyResourceProvider(session);
-    }
+  public static final String PROVIDER_ID = "api-key";
 
-    public void init(Config.Scope config) {}
+  public RealmResourceProvider create(KeycloakSession session) {
+    return new ApiKeyResourceProvider(session);
+  }
 
-    public void postInit(KeycloakSessionFactory factory) {}
+  public void init(Config.Scope config) {}
 
-    public void close() {}
+  public void postInit(KeycloakSessionFactory factory) {}
 
-    public String getId() {
-        return PROVIDER_ID;
-    }
+  public void close() {}
+
+  public String getId() {
+    return PROVIDER_ID;
+  }
 }
